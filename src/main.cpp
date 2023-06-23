@@ -1,6 +1,7 @@
 #include <Arduino.h>
 
-#include <LiquidCrystal.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
 #include <Adafruit_Sensor.h>
 #include <DHT.h>
 #include <DHT_U.h>
@@ -10,6 +11,7 @@
 #include <RTClib.h>
 
 RTC_DS3231 rtc;
+Adafruit_SSD1306 display = Adafruit_SSD1306(); //objeto do tipo Adafruit_SSD1306
 
 char t[32];
 #define DHTTYPE DHT11
@@ -24,35 +26,36 @@ String c_str = "";
 char dados[] = "MEDIDAS/00.csv";
 int c = 0; //variavel do contador
 
+//char carac1 = 't';
+// char carac2 = 'h';
 float temperatura = 0;
 float humidade = 0;
 DHT_Unified dht(DHTPIN, DHTTYPE);
 
-LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
 uint32_t delayMS;
 int registro = 1;
-byte grau[8] = {B00110, B01001, B01001, B00110,
-                B00000, B00000, B00000, B00000,};
-
 
  void setup() {
 
   dht.begin();
   Serial.begin(9600); //Inicializa a serial
-  lcd.begin(16,2);
-  lcd.clear(); //Limpa o LCD
-  lcd.setCursor(0, 0);
-  lcd.print("testando display");
-  delay(2000);
-  lcd.createChar(1, grau);
+  Wire.begin();
+  display.begin(SSD1306_SWITCHCAPVCC, 0x3C); 
+  display.setTextColor(WHITE); 
+  display.setTextSize(1);
+  display.setCursor(10,20);
+      display.print("teste");
+      display.display(); 
+      delay(1500);
+      display.clearDisplay();
   sensor_t sensor;
   dht.temperature().getSensor(&sensor);
   delayMS = sensor.min_delay / 1000;
-  lcd.clear();
   pinMode(ledVerde, OUTPUT);
   pinMode(ledAmarelo, OUTPUT);
   digitalWrite(ledAmarelo, LOW);
   digitalWrite(ledVerde, LOW);
+  
 
    if (!rtc.begin()){ // <== (Utilizei a própria função de inicialização no if de verificação, do mesmo modo do SD card)
     Serial.println("Rtc não está executando");
@@ -119,34 +122,29 @@ byte grau[8] = {B00110, B01001, B01001, B00110,
      myFile.close();
 }
 
-  void escrever(String nome, float valor, char carac){
+  void escrever(String nome, float valor,char carac){
     String stringValor = String(valor);
-    int numCarac = stringValor.length();
-
-    int TamanhoNome = nome.length();
+  
+    //int TamanhoNome = nome.length();
     
      if(carac == 't'){
-      // nome = temp:
+      nome = "Temp:";
       // TamanhoNome = 5
-      // numCarac = 5
-      int posicao = 2;
-      lcd.setCursor(posicao,0);
-      lcd.print(nome);
-      lcd.setCursor(posicao+TamanhoNome+1,0); // 2+5+1 = 7
-      lcd.print(valor);
-      lcd.setCursor(posicao+TamanhoNome+numCarac,0); //2+5+5+
-      lcd.write(1);
+      int posicao = 25;
+      display.setCursor(posicao,15);
+      display.print(nome);
+      display.print(valor); 
+      display.display();
   } else if(carac == 'h'){
-      // nome = humidade:
+      nome = "Humidade:";  
       // TamanhoNome = 9
-      // numCarac = 5
-      int posicao = 1;
-      lcd.setCursor(posicao,1);
-      lcd.print(nome);
-      lcd.setCursor(posicao+TamanhoNome+1,1);  // 1+9
-      lcd.print(valor);
-      lcd.setCursor(posicao+TamanhoNome+numCarac,1); // 1+9+5
-      lcd.print("%");
+      int posicao = 25;
+      display.setCursor(posicao,28);
+      display.print(nome);
+      display.print(valor);
+      display.print("%");
+      display.display();
+      display.clearDisplay();
     }
   }
 void temperature_file_log(uint8_t diaSemana, int dia, int mes, int ano , int hora, int minuto, int segundo, float t_C,float h , int registro,char *filename){
@@ -164,9 +162,11 @@ void temperature_file_log(uint8_t diaSemana, int dia, int mes, int ano , int hor
     minuto = now.minute() ;
     segundo = now.second() ;
 
-    lcd.setCursor(1,0);
-    lcd.print("Arquivo criado");
-    lcd.clear();
+    display.setCursor(20,20);
+    display.print("Arquivo criado");
+    display.display();
+    delay(2000);
+    display.clearDisplay();
     
    // Escreve a data, hora e dados em colunas
    switch(diaSemana){
@@ -223,10 +223,11 @@ void temperature_file_log(uint8_t diaSemana, int dia, int mes, int ano , int hor
     }
   else {
     // se o arquivo não abrir, imprima um erro:
-    lcd.setCursor(3,0);
-    lcd.print("Arquivo nao");
-    lcd.setCursor(3,1);
-    lcd.print("foi criado"); 
+    display.setCursor(10,20);
+    display.print("Arquivo nao foi criado");
+     display.display();
+     delay(2000);
+     display.clearDisplay();
     Serial.print("Erro na abertura do arquivo: "); //debug
     Serial.println(filename);
     }
@@ -244,14 +245,10 @@ void temperature_file_log(uint8_t diaSemana, int dia, int mes, int ano , int hor
   dht.temperature().getEvent(&event);
   if (isnan(event.temperature)) {
     Serial.println("Erro na leitura da Temperatura!");
-    lcd.setCursor(0, 0);
-    lcd.print("Erro temperatura");
-    delay(2000);
-    lcd.clear();
   }
   else {
-    String nome = "Temp:";
     char carac = 't';
+    String nome = "Temp:";
     temperatura = event.temperature;
     escrever(nome,temperatura,carac);
   }
@@ -260,8 +257,8 @@ void temperature_file_log(uint8_t diaSemana, int dia, int mes, int ano , int hor
     Serial.println("Erro na leitura da Umidade!");
   }
   else {
-    String nome = "Humidade:";
     char carac = 'h';
+    String nome = "Humidade:";
     humidade = event.relative_humidity;
     escrever(nome,humidade,carac);
     
@@ -278,9 +275,9 @@ void temperature_file_log(uint8_t diaSemana, int dia, int mes, int ano , int hor
 
   delay(1000);  
 
-  int limiar = 46;
-  bool condicao1 = now.hour() == 14 && now.minute() >=limiar && now.minute() <= limiar+1;
-  bool condicao2 = now.hour() == 14 && now.minute() >=limiar+2;
+  int limiar = 01;
+  bool condicao1 = now.hour() == 15 && now.minute() >=limiar && now.minute() <= limiar+1;
+  bool condicao2 = now.hour() == 15 && now.minute() >=limiar+2;
 
   if(condicao1) {
      digitalWrite(ledAmarelo, HIGH);
@@ -293,6 +290,11 @@ void temperature_file_log(uint8_t diaSemana, int dia, int mes, int ano , int hor
     if(condicao2){
       digitalWrite(ledAmarelo, LOW);
       digitalWrite(ledVerde, HIGH);
+      display.setCursor(8,20);
+      display.print("Terminei de escrever");
+      display.display();
+      delay(2000);
+      display.clearDisplay();
       Serial.println("Terminei de escrever;)"); //debug
       myFile.close();
     }
